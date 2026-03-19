@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "1975216869283e0476f8a437bbd8e04e28ebc8f5"
+project_hash = "afc9a09074adf5bf58786ca34616a216150a481e"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -276,7 +276,7 @@ version = "0.7.0"
 deps = ["LinearAlgebra", "RecipesBase", "StaticArrays"]
 path = "."
 uuid = "d11bbabd-dab6-4367-9c65-d486568a54a8"
-version = "1.0.0-DEV"
+version = "0.1.0"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
