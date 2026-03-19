@@ -16,18 +16,22 @@ show_subtitle(st,n = 1) = begin
     println("$sh > $(string(st))")
 end
 
-is_show_benchmarks = get(ENV, "CI" ,"false") 
+is_show_benchmarks = get(ENV, "CI" ,"false") == "false"
 
-@testset "ScaledPolynomials.jl" begin
-    #begin 
-        a = (0.1,-0.5,0.4,-1.0)
+@testset "ScaledPolynomials" begin
+
+        a = (0.1,-0.5,0.4,-1.0 , 20.0 , 45.6 , -1.5 , -100.0)
         N = length(a)
         show_title("Testing polynomials evaluation:")
-        @test Polynomials.Polynomial(a)(0.5) ≈ ScaledPolynomials.StandPoly(a)(0.5)
-        @test  Polynomials.ChebyshevT(a)(0.5) ≈ ScaledPolynomials.ChebPoly(a)(0.5)
-        @test  LegendrePolynomials.Pl(0.5 , 3) ≈ ScaledPolynomials.LegPoly((0.0, 0.0, 0.0, 1.0))(0.5)
-        @test  SpecialPolynomials.Bernstein{N - 1}(a)(0.5) ≈ ScaledPolynomials.BernsteinPoly(a)(0.5)
-
+        for x_i in (0.2 , 0.4 , -0.5 , 0.9)
+            @test Polynomials.Polynomial(a)(x_i) ≈ ScaledPolynomials.StandPoly(a)(x_i)
+            @test  Polynomials.ChebyshevT(a)(x_i) ≈ ScaledPolynomials.ChebPoly(a)(x_i)
+            @test  LegendrePolynomials.Pl(x_i , 3) ≈ ScaledPolynomials.LegPoly((0.0, 0.0, 0.0, 1.0))(x_i)
+            @test  LegendrePolynomials.Pl(x_i , 2) ≈ ScaledPolynomials.LegPoly((0.0, 0.0, 1.0, 0.0))(x_i)
+            @test  LegendrePolynomials.Pl(x_i , 1) ≈ ScaledPolynomials.LegPoly((0.0, 1.0, 0.0, 0.0))(x_i)
+            @test  LegendrePolynomials.Pl(x_i , 0) ≈ ScaledPolynomials.LegPoly((1.0, 0.0, 0.0, 0.0))(x_i)
+            @test  SpecialPolynomials.Bernstein{N - 1}(a)(x_i) ≈ ScaledPolynomials.BernsteinPoly(a)(x_i)
+        end    
         a = [1.0 , 22.0 , 3.0 , 4.56 , 3.51]
         N = length(a)
         x = range(-1.0,1.0,10)
@@ -41,15 +45,16 @@ is_show_benchmarks = get(ENV, "CI" ,"false")
                 b_der_test = Polynomials.derivative(b_test)
                 b_pw = CheckPolyType(a)
                 b_der = ScaledPolynomials.derivative(b_pw)
-                show_subtitle("$(TestPolyType)(x) evaluation: ", 3)
-                @btime $b_test(0.5)
-                show_subtitle(" $(CheckPolyType)(x) evaluation: ", 3)
-                @btime $b_pw(0.5)
-                
+                if is_show_benchmarks
+                    show_subtitle("$(TestPolyType)(x) evaluation: ", 3)
+                    @btime $b_test(0.5)
+                    show_subtitle(" $(CheckPolyType)(x) evaluation: ", 3)
+                    @btime $b_pw(0.5)
+                end
                 show_subtitle("derivative( $(TestPolyType) ) evaluation: ",3)
-                @btime $Polynomials.derivative($b_test)
+                is_show_benchmarks && @btime $Polynomials.derivative($b_test)
                 show_subtitle("derivative( $(CheckPolyType) ) evaluation: ",3)
-                @btime $ScaledPolynomials.derivative($b_pw)
+                is_show_benchmarks && @btime $ScaledPolynomials.derivative($b_pw)
 
                 if ~(TestPolyType <: SpecialPolynomials.Bernstein)
                     @test norm(ScaledPolynomials.coeffs(b_der) .- b_der_test.coeffs)≈ 0 atol = 1e-12
@@ -63,7 +68,8 @@ is_show_benchmarks = get(ENV, "CI" ,"false")
         a = (1.0,22.0,3.0,4.56,3.51)
         show_title("Default scaling polynomial derivative evaluation test:")
         for CheckPolyType in (ScaledPolynomials.BernsteinSymPoly, ScaledPolynomials.StandPoly, 
-                                    ScaledPolynomials.ChebPoly, ScaledPolynomials.LegPoly, ScaledPolynomials.TrigPoly)
+                                    ScaledPolynomials.ChebPoly, ScaledPolynomials.LegPoly,
+                                     ScaledPolynomials.TrigPoly)
 
             show_subtitle("Cheking the derivative for $CheckPolyType")
             pw_poly = CheckPolyType(a)

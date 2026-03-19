@@ -1,7 +1,6 @@
 module ScaledPolynomials
     using LinearAlgebra,  StaticArrays, RecipesBase
 
-    #using Interpolations
     import Base.Broadcast: broadcastable
 
     export BernsteinSymPoly, StandPoly , LegPoly , ChebPoly , ScaledPolynomial , AbstractPoly , VanderMatrix
@@ -455,22 +454,7 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
 
 
     scale_ξ_to_x(V::VanderMatrix) = Vector(scale_ξ_to_x.(V.xi, V.x_first,V.x_last))
-    function triplicate_columns(a::AbstractVector,T)
-        return T(repeat(a,1,3))
-    end
 
-    """
-        fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
-                    val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPoly}
-
-    Evaluates box-boundaries for polynomial coefficients for `BernsteinSymPoly` 
-    polynomial basis
-    """
-    function fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
-                    val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPoly}
-        fill!(lb,first(val_bounds))
-        fill!(ub,last(val_bounds))
-    end
 
     @recipe function f(m::Union{AbstractPoly,ScaledPolynomial})
         minorgrid--> true

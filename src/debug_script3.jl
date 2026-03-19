@@ -1,5 +1,5 @@
 using StaticArrays, Polynomials, Plots
-include("PolynomialWrappers.jl")
+include("ScaledPolynomials.jl")
 
 #V = PolynomialWrappers.VanderMatrix(SVector((1.0,2.3,4.5,6.7,8.9)),PolynomialWrappers.StandPolyWrapper{10,Float64})
 a = (1.0,1.0,1.0,2.3,4.5,6.7)
@@ -82,3 +82,24 @@ function ai_eval_scaled_poly(leg::LegPoly{N,T}, x::S, a, b) where {N,T,S}
     # Для n=0: α_0 = 1, β_1 = 1/2
     return R(leg.coeffs[1]) + ξ * b_next1 - R(0.5) * b_next2
 end
+
+
+## this function moved from 
+#=
+    function triplicate_columns(a::AbstractVector,T)
+        return T(repeat(a,1,3))
+    end
+
+    """
+        fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
+                    val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPoly}
+
+    Evaluates box-boundaries for polynomial coefficients for `BernsteinSymPoly` 
+    polynomial basis
+    """
+    function fill_box_constraint!(lb,ub,::VanderMatrix{N, CN, T, NxCN, CNxCN, P},
+                    val_bounds::NTuple{2,T}) where {N, CN, T, NxCN, CNxCN, P<:BernsteinSymPoly}
+        fill!(lb,first(val_bounds))
+        fill!(ub,last(val_bounds))
+    end
+    =#
