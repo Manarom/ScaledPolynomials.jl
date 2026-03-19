@@ -1,2 +1,4 @@
-src\runtest.jl
-src\debug_script3.jl
+/src/runtest.jl
+/src/debug_script3.jl
+/Manifest.toml
+
