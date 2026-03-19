@@ -11,7 +11,8 @@ The main goal is to eliminate manual coordinate mapping between your working ran
 ### Features:
 * **Automatic Mapping**: The `ScaledPolynomial` wrapper handles $x \to \xi$ transformation during evaluation.
 * **Minimal Dependencies**: Built only on `LinearAlgebra` and `StaticArrays`. No heavy external packages.
-* **Performance**: Leverages `StaticArrays` for coefficients and the Clenshaw scheme for stable evaluation.
+* **Performance**: Leverages `StaticArrays` for coefficients and the Clenshaw scheme for stable evaluation
+(check tests for performance comparison).
 * **Bases**: Supports Chebyshev (`ChebPoly`), Legendre (`LegPoly`), Bernstein, Standard, and Trigonometric polynomials.
 * **Utilities**: Quick derivative computation and basic `polyfit` via Vandermonde matrices.
 
@@ -21,7 +22,7 @@ Since this package is not registered in the General registry, you can install it
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com")
+Pkg.add(url="https://github.com/Manarom/ScaledPolynomials.jl.git")
 ```
 
 ### Quick Start
