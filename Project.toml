@@ -1,0 +1,7 @@
+name = "ScaledPolynomials"
+uuid = "d11bbabd-dab6-4367-9c65-d486568a54a8"
+authors = ["Roman Mironov"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.10"
