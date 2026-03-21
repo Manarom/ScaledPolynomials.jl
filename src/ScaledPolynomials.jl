@@ -117,9 +117,10 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
             @assert xmin < xmax "xmin must be smaller than xmax"
             new{Ptype,T}(poly,xmin,xmax)
         end
-        ScaledPolynomial(p::P;xmin = left_scaler(), xmax = right_scaler()) where P <: AbstractPoly{N,T} where {N,T} = 
+        ScaledPolynomial(p::P ; xmin = left_scaler(), xmax = right_scaler()) where P <: AbstractPoly{N,T} where {N,T} = 
                 new{P,T}(p, xmin, xmax)
     end
+    
 
             """
         (sp::ScaledPolynomial{P,T})(x::T) where {P,T}
@@ -128,7 +129,7 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
     """
     (sp::ScaledPolynomial)(x) = eval_poly(sp, x)
     eval_poly(p::ScaledPolynomial, x)   = scale_x_to_ξ(x, p) |> p.poly
-    eval_scaled_poly(p::ScaledPolynomial, x, _, _) = scale_x_to_ξ(x, p) |> eval_scaled_poly(p.poly,x,p.xmin,p.xmax)
+    eval_scaled_poly(p::ScaledPolynomial, x, xmin, xmax) =  eval_scaled_poly(p.poly , x , xmin , xmax)
 
     left_scaler(p::ScaledPolynomial) = p.xmin
     right_scaler(p::ScaledPolynomial) = p.xmax
@@ -142,6 +143,7 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
         p_der.coeffs .*= span
         return ScaledPolynomial(p_der , xmin = left_scaler(sp) , xmax = right_scaler(sp))
     end
+
     function derivative!(p_der::ScaledPolynomial, p::ScaledPolynomial)
             (p_der.xmin == left_scaler(p) && p_der.xmax == right_scaler(p))|| error("polynomials must be of the same scaling")
             span = scale_span_ξ_by_x(p)
@@ -165,23 +167,18 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
     scale_ξ_to_x(ξ, p::ScaledPolynomial) = scale_ξ_to_x(ξ, p.xmin, p.xmax)
 
 
-    const AnyPoly  = Union{ScaledPolynomial,AbstractPoly}
+    const AnyPoly{N , T , V}  = Union{ScaledPolynomial{<: AbstractPoly{N , T, V}} , AbstractPoly{N , T , V}} 
     """
         scale_x_to_ξ(x::AbstractVector)
 
-    Makes all elements of vector x to fit in range $(LEFT_SCALER)...$(RIGHT_SCALER)
-    returns normalized vector , xmin and xmax values
-    All elements of x must be unique
-    Makes all elements of vector x to fit in range $(LEFT_SCALER)...$(RIGHT_SCALER)
-    returns normalized vector , xmin and xmax values
-    All elements of x must be unique
-
+    Maps all elements of vector x to fit in range $(LEFT_SCALER)...$(RIGHT_SCALER)
+    Creating a copy, returns xmin and xmax of the initial vector
     """
     function scale_x_to_ξ(x::AbstractVector)
         ξ  = copy(x)
         return scale_x_to_ξ!(ξ)
     end
-    function scale_x_to_ξ(x::StaticVector) 
+    function scale_x_to_ξ(x::Union{StaticVector , NTuple}) 
         x_min, x_max = extrema(x)
         s= scale_span()/(x_max - x_min)
         a = left_scaler()
@@ -237,8 +234,8 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
 
     const SUPPORTED_POLYNOMIAL_TYPES = Base.ImmutableDict([k=>eval(d) for (k,d) in  POLY_NAMES_TYPES_DICT]...)
 
-    poly_name(::P) where P<: AbstractPoly{N,T,V} where {N,T,V} = V
-    poly_name(::Type{P}) where P<: AbstractPoly{N,T,V} where {N,T,V} = V
+    poly_name(::P) where P <: AbstractPoly{N,T,V} where {N,T,V} = V
+    poly_name(::Type{P}) where P <: AbstractPoly{N,T,V} where {N,T,V} = V
 
     poly_degree(::AbstractPoly{N}) where {N} = N - 1
     poly_degree(::Type{P}) where P<:AbstractPoly{N} where {N} = N - 1
@@ -246,7 +243,13 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
     parnumber(::AbstractPoly{N,T,V}) where {N,T,V} = N
     parnumber(::ScaledPolynomial{Poly}) where {Poly <: AbstractPoly{N}} where N = N
 
-    function polyfit!(p::Union{AbstractPoly{N,T},ScaledPolynomial{PV}}, x::V , y::V) where {PV <:AbstractPoly{N,T}, V <:AbstractVector{D} } where {N,T,D}
+    """
+    polyfit!(p::AnyPoly{N , T}, x::V , y::V) where { V <:AbstractVector{D} } where {N,T,D}
+
+Fits polynomial coefficients to the data x , y only if the entire x vector is within the domain 
+of the polynomial see [`is_in_domain`](@ref)
+"""
+function polyfit!(p::AnyPoly{N , T}, x::V , y::V) where { V <:AbstractVector{D} } where {N,T,D}
         @assert is_in_domain(p, x) "All values of x must be within range"
         M = length(x)
         @assert length(y) == M "x and y must be of the same size"
@@ -255,26 +258,30 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
         refill!(p,Vand\y)
         return p
     end
-    function polyfit_unscaled!(p::AbstractPoly{N,T}, x::V , y::V) where { V <:AbstractVector{D} } where {N,T,D}
-        @assert is_in_domain(p, x) "All values of x must be within range"
+    function polyfit_unscaled!(p::AnyPoly{N,T}, x::V , y::V) where { V <:AbstractVector{D} } where {N,T,D}
         M = length(x)
         @assert length(y) == M "x and y must be of the same size"
         (xmin , xmax) = extrema(x)
         Vand = Matrix{D}(undef, M, N)
         _fill_vander_unscaled!(Vand , p , x, xmin, xmax)
-        refill!(p,Vand\y)
+        refill!(p , Vand\y)
         return p
     end
+
     polyfit_unscaled(::Type{P}, x , y) where P <: AbstractPoly{N,T} where {N,T} =  polyfit_unscaled!(P() , x , y)
     polyfit(::Type{P}, x , y) where P <: AbstractPoly{N,T} where {N,T} =  polyfit!(P() , x , y)
-    vander(p::AbstractPoly{N,T} , x) where {N,T}= begin 
+
+    vander(p::AnyPoly{N,T} , x::AbstractVector{D}) where {N, D ,T}= begin 
             M = length(x)
-            Vand = Matrix{T}(undef, M, N)
+            Vand = Matrix{D}(undef, M, N)
             _fill_vander!(Vand , p , x)    
             return Vand
     end
+
     vander(::Type{P} , x)  where P <: AbstractPoly{N,T} where {N,T} = vander(P() , x) 
+
     is_in_domain(v) = left_scaler() <= minimum(v) && maximum(v) <= right_scaler()
+
     is_in_domain(p::AnyPoly, v) =  left_scaler(p) <= minimum(v) && maximum(v) <= right_scaler(p)
 
     """
@@ -284,7 +291,7 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
     supports various types of internal polynomials 
     Structure VanderMatrix has the following fields:
         v - the matrix itself (each column of this matrix is the value of basis function)
-        v_unnorm - version of matrix with unnormalized basis vectors (used for annormalized coefficients of polynomial fitting)
+        v_unscaled - version of matrix with unnormalized basis vectors (used for annormalized coefficients of polynomial fitting)
         x_first -  first element of the initial vector 
         x_last  -  the last value of the initial vector
         xi - normalized vector 
@@ -292,7 +299,7 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
     """
     struct VanderMatrix{N,CN,T,NxCN,CNxCN,P} #M <: SMatrix , R <: SMatrix, V <: SVector}
         v::SMatrix{N,CN,T,NxCN} # matrix of approximating functions 
-        v_unnorm::SMatrix{N,CN,T,NxCN} # unnormalized vandermatrix used to convert fitted parameters if necessarys
+        v_unscaled::SMatrix{N,CN,T,NxCN} # unscaled vandermatrix used to convert fitted parameters if necessarys
         # QR factorization matrices
         Q::SMatrix{N,CN,T,NxCN} 
         R::SMatrix{CN,CN,T,CNxCN}
@@ -319,17 +326,19 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
         poly_type - polynomial type name, must be member of SUPPORTED_POLYNOMIAL_TYPES
 
     """
-    function VanderMatrix(x::StaticVector{N,T},
-                        poly_obj::P # = BernsteinSymPoly{CN,PN}
-                        ) where {N, T, P <: AbstractPoly{CN,PN}} where {CN,PN}
+    function VanderMatrix(x::Union{StaticVector{N , T} , NTuple{N , T}},
+                        poly_obj::P #  e.g. BernsteinSymPoly{CN , DT} of ScaledPolynomial{BernsteinSymPoly{CN , DT} } 
+                        ) where {N, T, P <:AnyPoly{CN , DT}}  where {CN , DT}
                 # N - number of rows, CN - number of columns
                 @assert N >= CN "Degree of polynomial must be less or equal the length og x"
                 (_xi,x_first,x_last) = scale_x_to_ξ(x)
-                V = Matrix{T}(undef,N,CN) 
-                Vunnorm = Matrix{T}(undef,N,CN)  # T{length(x)}(MVector{length(x)}(x))
-                fill!(poly_obj, zero(PN))
-                _fill_vander!(V, poly_obj,_xi)
-                _fill_vander_unscaled!(Vunnorm, poly_obj, x,  x_first, x_last)
+                V = Matrix{T}(undef , N , CN) 
+                Vunscled= Matrix{T}(undef , N , CN)  # T{length(x)}(MVector{length(x)}(x))
+                fill!(poly_obj, zero(DT))
+                _fill_vander!(V, poly_obj , _xi)
+                internal_poly = P  <: AbstractPoly ? poly_obj : poly_obj.poly 
+                _fill_vander_unscaled!(Vunscled, internal_poly , x,  x_first, x_last)
+
                 NxCN =  N * CN     
                 MatrixType  = SMatrix{N, CN, T,NxCN}
                 CNxCN =  CN * CN
@@ -337,8 +346,9 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
                 VectorType = SVector{N,T}
                 _V = MatrixType(V)
                 (Q,R) = qr(_V)
+
                 VanderMatrix{N,CN,T,NxCN,CNxCN,P}(_V,# Vandermonde matrix
-                    MatrixType(Vunnorm), #unnormalized vandermatrix
+                    MatrixType(Vunscled), # unnormalized vandermatrix
                     MatrixType(Q),
                     RMatrixType(R),
                     x_first, # first element of the initial array
@@ -348,34 +358,34 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
     end
     poly_name(::VanderMatrix{N,CN,T,NxCN,CNxCN,P}) where {N,CN,T,NxCN,CNxCN,P} = poly_name(P)
     """
-        _fill_vander!(V, poly_obj::AbstractPoly,xi)
+    _fill_vander!(V , poly_obj::AnyPoly{N , T} , xi::Union{AbstractVector{D} , NTuple{NX , D}}) where {NX , N,  D , T}
 
-    Function to fill the matrix V columns from polynomial basis functions constructor
-    with argument vector xi 
-    """
-    function _fill_vander!(V, poly_obj::Union{AbstractPoly{N,T}, ScaledPolynomial{Ptype}},xi::AbstractVector{D}) where {N, T, D, Ptype <: AbstractPoly{N} }
+Function to fill the matrix V columns from polynomial 
+with argument vector xi 
+"""
+    function _fill_vander!(V, poly_obj::AnyPoly{N , T} , xi::Union{AbstractVector{D} , NTuple{NX , D}}) where {NX , N,  D , T}
         @assert size(V,2) == N "wrong size"
         @assert size(V,1) == length(xi) "wrong size"
         VW = @views eachcol(V)
         fill!(poly_obj,zero(D))
         @inbounds for (i,col) ∈ enumerate(VW)
-            coeffs(poly_obj)[i] = one(D)                             
+            coeffs(poly_obj)[i] = one(T)                             
             @. col = poly_obj(xi)
-            coeffs(poly_obj)[i] = zero(D)
+            coeffs(poly_obj)[i] = zero(T)
         end  
         return V
     end
     
-    function _fill_vander_unscaled!(V , p::AbstractPoly{N,T}, xi::AbstractVector{D} , xmin , xmax) where {N, T, D }
+    function _fill_vander_unscaled!(V::AbstractMatrix{D} , p::AbstractPoly{N,T}, xi::Union{AbstractVector{D} , NTuple{NX , D}} , xmin , xmax) where {NX , N, T, D }
         @assert size(V,2) == N "wrong size"
         @assert size(V,1) == length(xi) "wrong size"
         VW = @views eachcol(V)
-        fill!(p, zero(D))
+        fill!(p, zero(T))
         #f = Base.Fix1(eval_scaled_poly,p)
         @inbounds for (i,col) ∈ enumerate(VW)
-            coeffs(p)[i] = one(D)                             
+            coeffs(p)[i] = one(T)                             
             @. col = eval_scaled_poly(p, xi, xmin, xmax)
-            coeffs(p)[i] = zero(D)
+            coeffs(p)[i] = zero(T)
         end  
         return V
     end
@@ -422,30 +432,39 @@ const POLY_NAMES_TYPES_DICT = Base.ImmutableDict(
     returns tuple with vector of polynomial coefficients, values of y_fitted at x points
     and the norm of goodness of fit     
     """
-    function polyfit(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
-        yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(scale_ξ_to_x(V)) : y
-        a =SVector{CN,T}(V.R\(transpose(V.Q)*yi)) # calculating pseudo-inverse
-        y_fit = V*a
-        goodness_fit = norm(yi .- y_fit)
+    function polyfit(V::VanderMatrix{N , CN , T , NxCN , CNxCN , P} , x::VT , y::VT) where {N , NxCN, CNxCN , CN , P , T <: Number , VT <: AbstractVector{T}}
+        y_fit = similar(y)
+        if  is_the_same_x(V,x) 
+            a =SVector{CN,T}(V.R\(transpose(V.Q)*y)) # calculating pseudo-inverse
+            mul!(y_fit, V.v , a)
+        else 
+            _p = polyfit(P , x , y)
+            a = SVector{CN,T}( coeffs(_p) )
+            y_fit  = _p.(x)
+        end
+        goodness_fit = norm(y .- y_fit)
         return  (a, y_fit, goodness_fit) 
     end
     """
-        polyfitn(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
+    polyfit_unscaled(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
 
-    Fits data x - coordinates, y - values using the VanderMatrix
-    basis function (coefficients for unnormalized x-vector)
+Fits data x - coordinates, y - values using the VanderMatrix
+basis function (coefficients for unnormalized x-vector)
 
-    Input:
-        x - coordinates, [Nx0]
-        y - values, [Nx0]
-    returns tuple with vector of polynomial coefficients, values of y_fitted at x points
-    and the norm of goodness of fit  
-    """
-    function polyfit_unscaled(V::VanderMatrix{N,CN,T},x::VT,y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
-        yi =  !is_the_same_x(V,x) ? linear_interpolation(x,y)(scale_ξ_to_x(V)) : y
-        (Q,R) = qr(V.v_unnorm)
-        a =SVector{CN,T}(R\transpose(Q)*yi)# calculating pseudo-inverse
-        y_fit = V.v_unnorm * a
+Input:
+    x - coordinates, [Nx0]
+    y - values, [Nx0]
+returns tuple with vector of polynomial coefficients, values of y_fitted at x points
+and the norm of goodness of fit  
+"""
+function polyfit_unscaled(V::VanderMatrix{N , CN , T} , x::VT , y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
+        if is_the_same_x(V,x) 
+            (Q,R) = qr(V.v_unscaled)
+            a =SVector{CN,T}(R \ transpose(Q) * y)# calculating pseudo-inverse
+            y_fit = V.v_unscaled * a
+        else
+            
+        end
         goodness_fit = norm(yi .- y_fit)
         return  (a, y_fit, goodness_fit) 
     end

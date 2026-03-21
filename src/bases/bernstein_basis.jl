@@ -65,8 +65,8 @@ end
     return _de_casteljau_recursive(coeffs, t, _1_t)
 end
 
-# Базовый случай: когда остался один коэффициент — это ответ
-@inline _de_casteljau_recursive(coeffs::SVector{1, R}, t, _1_t) where R = coeffs[1]
+# just return the single coeff 
+@inline _de_casteljau_recursive(coeffs::SVector{1, R} , _ , _) where R = coeffs[1]
 
 
 @inline function _de_casteljau_recursive(coeffs::SVector{K, R}, t, _1_t) where {K, R}
@@ -74,7 +74,7 @@ end
     return _de_casteljau_recursive(next_coeffs, t, _1_t)
 end
 
-# BernsteinPoly   - standard for 
+# BernsteinPoly   is a classical Bernstein basis scaled from 0 to  1
 left_scaler(::BernsteinPoly) = 0.0
 right_scaler(::BernsteinPoly) = 1.0
 (p:: BernsteinSymPoly{N,T})(x::T)  where {N,T} = eval_scaled_poly(p, x, T(left_scaler(p)),T(right_scaler(p)))
