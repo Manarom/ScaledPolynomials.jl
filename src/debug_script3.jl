@@ -3,8 +3,8 @@ include("ScaledPolynomials.jl")
 
 #V = PolynomialWrappers.VanderMatrix(SVector((1.0,2.3,4.5,6.7,8.9)),PolynomialWrappers.StandPolyWrapper{10,Float64})
 a = (1.0,1.0,1.0,2.3,4.5,6.7)
-p = PolynomialWrappers.TrigPolyWrapper(a)
-p_der = PolynomialWrappers.derivative(p)
+p = ScaledPolynomials.TrigPolyWrapper(a)
+p_der = ScaledPolynomials.derivative(p)
 x = -1.0:1e-2:1.0
 ppp = Polynomials.fit(Polynomial,x,p.(x),20)
 
