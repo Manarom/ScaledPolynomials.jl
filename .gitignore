@@ -1,6 +1,6 @@
 /src/runtest.jl
 /src/debug_*.jl
-#/Manifest.toml
+Manifest.toml
 #/test/Manifest.toml
 #/notebook/Manifest.toml
 
