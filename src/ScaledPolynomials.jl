@@ -416,32 +416,23 @@ with argument vector xi
 
     Fits data x - coordinates, y - values using the VanderMatrix
     basis function (this coefficients for normalized x-vector)
-    ```julia
-        (a,y_fitted, gf) = polyfit(V,x,y)
-        y_fitted =  V.v*a # V.v - is the vandermonde matrix
-        # for normalized x, which has all values within [-1,1] range
-        # if a = [a₁ , ..., aₙ], 
-        # e.g if V is for standard basis:
-        (xnorm,) = scale_x_to_ξ(x) # returns vector 
-        # y_fitted = a₁ + a₂xnorm + ... + aₙxnormⁿ⁻¹
-    ```
 
-    Input:
-        x - coordinates, [Nx0]
-        y - values, [Nx0]
-    returns tuple with vector of polynomial coefficients, values of y_fitted at x points
-    and the norm of goodness of fit     
+Input:
+    x - coordinates, [Nx0]
+    y - values, [Nx0]
+returns tuple with vector of polynomial coefficients, values of y_fitted at x points
+and the norm of goodness of fit     
     """
     function polyfit(V::VanderMatrix{N , CN , T , NxCN , CNxCN , P} , x::VT , y::VT) where {N , NxCN, CNxCN , CN , P , T <: Number , VT <: AbstractVector{T}}
+        @assert is_the_same_x(V,x)  "Polyfit using vandermatrix works only for fixed x vector"
         y_fit = similar(y)
-        if  is_the_same_x(V,x) 
-            a =SVector{CN,T}(V.R\(transpose(V.Q)*y)) # calculating pseudo-inverse
-            mul!(y_fit, V.v , a)
-        else 
+        a =SVector{CN,T}(V.R\(transpose(V.Q)*y)) # calculating pseudo-inverse
+        mul!(y_fit, V.v , a)
+        #=
             _p = polyfit(P , x , y)
             a = SVector{CN,T}( coeffs(_p) )
             y_fit  = _p.(x)
-        end
+        =#
         goodness_fit = norm(y .- y_fit)
         return  (a, y_fit, goodness_fit) 
     end
@@ -457,14 +448,11 @@ Input:
 returns tuple with vector of polynomial coefficients, values of y_fitted at x points
 and the norm of goodness of fit  
 """
-function polyfit_unscaled(V::VanderMatrix{N , CN , T} , x::VT , y::VT) where {N,CN,T<:Number,VT<:Vector{T}}
-        if is_the_same_x(V,x) 
-            (Q,R) = qr(V.v_unscaled)
-            a =SVector{CN,T}(R \ transpose(Q) * y)# calculating pseudo-inverse
-            y_fit = V.v_unscaled * a
-        else
-            
-        end
+function polyfit_unscaled(V::VanderMatrix{N , CN , T} , x::VT , y::VT) where {N , CN , T<:Number , VT<:Vector{T}}
+        is_the_same_x(V,x) 
+        (Q,R) = qr(V.v_unscaled)
+        a =SVector{CN,T}(R \ transpose(Q) * y)# calculating pseudo-inverse
+        mul!(y_fit  ,  V.v_unscaled , a)
         goodness_fit = norm(yi .- y_fit)
         return  (a, y_fit, goodness_fit) 
     end
@@ -472,7 +460,7 @@ function polyfit_unscaled(V::VanderMatrix{N , CN , T} , x::VT , y::VT) where {N,
 
 
 
-    scale_ξ_to_x(V::VanderMatrix) = Vector(scale_ξ_to_x.(V.xi, V.x_first,V.x_last))
+    scale_ξ_to_x(V::VanderMatrix) = Vector(scale_ξ_to_x.(V.xi, V.x_first , V.x_last))
 
 
     @recipe function f(m::Union{AbstractPoly,ScaledPolynomial})

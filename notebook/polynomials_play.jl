@@ -248,7 +248,7 @@ md"Add noise $(@bind noise_amplitude Slider(0.0:1e-2:1, default =  0.0, show_val
 # ╔═╡ faaa4542-2066-49fc-b978-a6a45a4cca4e
 begin 
 	y_bern = (1.0 .+ noise_amplitude*rand(NPOINTS)).*(V*a_real)
-	sum(eachcol(V.v_unnorm)) # checking normalization
+	sum(eachcol(V.v_unscaled)) # checking normalization
 end;
 
 # ╔═╡ 67918393-0efb-4c8a-a291-3d86f7853cce
@@ -283,9 +283,11 @@ The following table shows the coeffieicnts of bernstein monomial fitting with st
 # ╔═╡ 1fa31f4b-7ed5-46fa-87ad-e5a4d22d59d6
 begin 
 	stand_bas = ScaledPolynomials.StandPoly{bern_degree + 1, Float64}
-	standart_basis_bern_monomial_fit_poly = ScaledPolynomials.polyfit(stand_bas,Vector(x),Vector(Vbern.v[:,sub_monomial_degree +1]))
+	bern_bas = ScaledPolynomials.BernsteinSymPoly{bern_degree + 1, Float64}()
+	VV = ScaledPolynomials.vander(bern_bas , Vector(x))
+	standart_basis_bern_monomial_fit_poly = ScaledPolynomials.polyfit(stand_bas,Vector(x),VV[: , sub_monomial_degree + 1])
 	
-	plot(x,Vbern.v[:,sub_monomial_degree +1],label="Bernstein monomial $(sub_monomial_degree)")
+	plot(x,VV[: , sub_monomial_degree + 1],label="Bernstein monomial $(sub_monomial_degree)")
 	plot!(x,standart_basis_bern_monomial_fit_poly.(x),label = "Standard basis fit")
 end
 
@@ -452,6 +454,9 @@ end
 	"""
 end
 
+# ╔═╡ c8f1e2f2-cefb-4009-8c08-2574e1e6846a
+md"Use constraints $(@bind is_constraint CheckBox(false))"
+
 # ╔═╡ 46a3593e-9653-49e8-8f11-b39b61176897
 begin
 	Bound_Type = ScaledPolynomials.BernsteinSymPoly{length(a_lb),Float64}
@@ -460,13 +465,10 @@ begin
 	y_bern_noisy = (1.0 .+ demo_data_noise*rand(NPOINTS)).*(v_data*a_f_vect);
 	
 	
-	bound_vander_mat = ScaledPolynomials.VanderMatrix(x,Bound_Type)
+	bound_vander_mat = ScaledPolynomials.VanderMatrix(x,Bound_Type())
 	a_lb_vect = [a_lb...]
 	a_ub_vect = [a_ub...]
 end;
-
-# ╔═╡ c8f1e2f2-cefb-4009-8c08-2574e1e6846a
-md"Use constraints $(@bind is_constraint CheckBox(false))"
 
 # ╔═╡ 5cfef29e-4687-46b2-89d0-97c7579e198e
 md"""
@@ -476,7 +478,7 @@ md"""
 # ╔═╡ 106d13d1-5310-4a9f-a688-778351c56a9f
 begin 
 	fun_optim = (x,_)  -> sum( t->^(t,2) , y_bern_noisy .- bound_vander_mat*x)
-	fun_opt = OptimizationFunction(fun_optim,AutoForwardDiff()) 
+	fun_opt = OptimizationFunction(fun_optim , NoAutoDiff()) 
 	starting_vector =0.5*(  a_ub_vect .+ a_lb_vect )
 	probl = if is_constraint
 	 OptimizationProblem(fun_opt, 
@@ -495,8 +497,10 @@ end
 begin
 	pp_b = scatter(x,y_bern_noisy,label="data",legendcolumn=3) #1
 	
-	bern_coeffs_locations = Main.bern_max_locations(bound_vander_mat)
+	bern_coeffs_locations = ScaledPolynomials.bern_max_locations(bound_vander_mat)
+	
 	plot!(pp_b,x,bound_vander_mat*a_lb_vect,label="lower bound",linewidth=3,linecolor=:green)
+	
 	scatter!(pp_b,bern_coeffs_locations,a_lb_vect,markercolor=:green,label ="lb coeffs", markersize = 6)
 	plot!(pp_b,x,bound_vander_mat*a_solve,linewidth=3,label = "fitting results")
 	plot!(pp_b,x,bound_vander_mat*a_ub_vect,label="upper bound",linewidth=3,linecolor=:red)
@@ -515,48 +519,33 @@ if PolyType <: ScaledPolynomials.BernsteinPoly || PolyType <: ScaledPolynomials.
 	ScaledPolynomials.bern_max_locations(PolyType())
 end;
 
-# ╔═╡ e1cc3acf-f257-443a-bf59-4253523739a7
-ScaledPolynomials.bern_max(PolyType , 1)
-
-# ╔═╡ a365088c-4239-4068-9367-d070b1ad8fce
-a_lb
-
-# ╔═╡ 36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
-Vstand = ScaledPolynomials.VanderMatrix(x,ScaledPolynomials.StandPoly{polydegree + 1,Float64}())
-
-# ╔═╡ 1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
-fit_res = ScaledPolynomials.polyfit(Vstand,Vector(x),Vector(y_bern))
-
 # ╔═╡ 8e492f7d-b959-4635-b524-feb48ba5f139
 begin 
 	NNN = 10
 	XXX = SVector{NNN}(collect(range(-1.0,1.0,NNN)))
-	V_stand = Main.VanderMatrix(XXX,Main.StandPolyWrapper{NNN,Float64})
-	V_leg = Main.VanderMatrix(XXX,Main.LegPolyWrapper{NNN,Float64})
-	V_bern2 = Main.VanderMatrix(XXX,Main.BernsteinSymPolyWrapper{NNN,Float64})
+	V_stand = ScaledPolynomials.VanderMatrix(XXX,ScaledPolynomials.StandPoly{NNN,Float64}())
+	V_leg = ScaledPolynomials.VanderMatrix(XXX,ScaledPolynomials.LegPoly{NNN,Float64}())
+	V_bern2 = ScaledPolynomials.VanderMatrix(XXX,ScaledPolynomials.BernsteinSymPoly{NNN,Float64}())
 	p_spectra = plot()
 	for V in (V_stand,V_leg,V_bern2)
-		plot!(p_spectra, svd(V.v).S, label = string(Main.poly_name(V)),linewidth= 3,markersize=8,marker=:auto,markeralpha=0.5)
+		plot!(p_spectra, svd(V.v).S, label = string(ScaledPolynomials.poly_name(V)),linewidth= 3,markersize=8,marker=:auto,markeralpha=0.5)
 	end
 	title!(p_spectra,"Singular values spectra for various polynomial bases")
 	p_spectra
 end
 
-# ╔═╡ ebc42c78-90d4-4a49-84c1-93afa4a3f8d9
-md" a = $(@bind scr Scrubbable(20.0,default = 10))"
-
 # ╔═╡ Cell order:
-# ╠═d20e7502-fa03-4448-84f4-dc46acf52c9b
-# ╠═14fe8399-7d59-4382-bc53-6e9ae4c05a8c
+# ╟─d20e7502-fa03-4448-84f4-dc46acf52c9b
+# ╟─14fe8399-7d59-4382-bc53-6e9ae4c05a8c
 # ╟─f240500d-1198-49f7-b043-beea86a248c7
 # ╟─c8102be0-6f8f-406e-9f18-45f462116602
 # ╟─381fd867-f404-40e5-a270-ae98f50bf9b5
 # ╟─1b15f3f8-fd8e-43c5-8c21-0b6fca139427
-# ╠═81edb295-c20f-47a9-8a6f-d21e475df6a9
+# ╟─81edb295-c20f-47a9-8a6f-d21e475df6a9
 # ╟─0dbf180e-8b27-4be7-8747-e424f37e2e50
 # ╟─a6381315-af21-4117-beed-6e3f7b8b8ca9
 # ╟─c6dfdffe-8dd7-4264-9b75-c435c5bbf941
-# ╠═3b475ddd-be05-4c56-9b28-68a808fc6e11
+# ╟─3b475ddd-be05-4c56-9b28-68a808fc6e11
 # ╟─e243649b-b920-4ca3-b2f3-6e9b5ada13c9
 # ╟─7d6bf89c-4a52-4ed3-93ba-08c9f972c7a4
 # ╟─52c7978a-c51b-40ac-9604-0485ff469141
@@ -566,22 +555,22 @@ md" a = $(@bind scr Scrubbable(20.0,default = 10))"
 # ╟─d130ca1e-94be-48b3-9c09-956a7a6b6bf4
 # ╟─e9e28b59-36a2-406c-8f1e-488140aa9bc8
 # ╟─9aad3160-fb56-4407-bdb7-f969d2b982a3
-# ╠═54e44992-423e-4ebb-92e6-2af89b52e7f7
+# ╟─54e44992-423e-4ebb-92e6-2af89b52e7f7
 # ╟─bb55121f-9e67-446d-bf4f-4fc3dfe48062
 # ╟─3280488d-efef-4833-ae37-6ea534f50df4
 # ╟─facb5dae-3ee9-4380-8c92-0e94c93c84bc
 # ╟─14ef768c-7039-4f34-862d-f58acf89e7d6
 # ╟─0b00c857-aeb8-47ee-a9c2-b94fc32e9fb3
-# ╠═56554cd8-e858-43d8-b6ef-7593d044920c
-# ╠═132a1594-326c-4d48-88ce-b7756656b606
-# ╠═c0418e2e-a6b6-4af5-a639-6d13952c88de
+# ╟─56554cd8-e858-43d8-b6ef-7593d044920c
+# ╟─132a1594-326c-4d48-88ce-b7756656b606
+# ╟─c0418e2e-a6b6-4af5-a639-6d13952c88de
 # ╟─7e1bcb20-a71a-4e9b-b797-dea6922f4cf8
 # ╟─edeab52f-317e-42dc-840e-5bedece45dd8
 # ╟─8c2bdb7c-aad4-4dd7-b6e2-97cf7dce0e56
 # ╟─faaa4542-2066-49fc-b978-a6a45a4cca4e
 # ╟─67918393-0efb-4c8a-a291-3d86f7853cce
 # ╟─fd446c33-d439-439f-bd0a-f36770856cd2
-# ╠═67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
+# ╟─67ec5900-5ab4-4b8d-b9ac-7d34a01a7229
 # ╟─4349710e-529b-4036-8986-6140292457c2
 # ╟─9c73d7b0-547a-4577-8655-45a4e13df7a8
 # ╟─7dfbac39-8e1b-4d88-830f-d18d94ed5e1b
@@ -590,17 +579,12 @@ md" a = $(@bind scr Scrubbable(20.0,default = 10))"
 # ╟─616b871e-3229-4cb2-a60e-e9044485a330
 # ╟─32dccd18-3140-446d-b997-8fd01d0dd359
 # ╟─d66a01ba-6040-4935-b36b-065015a0510c
-# ╠═76c60a39-9d68-4765-b698-7c1943572be8
+# ╟─76c60a39-9d68-4765-b698-7c1943572be8
 # ╟─68e6ca68-e895-4f4f-a2a0-945422827e22
+# ╟─c8f1e2f2-cefb-4009-8c08-2574e1e6846a
 # ╟─6aea3077-0fd9-47ab-8da6-30ef3fc46bda
 # ╟─46a3593e-9653-49e8-8f11-b39b61176897
-# ╟─c8f1e2f2-cefb-4009-8c08-2574e1e6846a
 # ╟─5cfef29e-4687-46b2-89d0-97c7579e198e
 # ╟─106d13d1-5310-4a9f-a688-778351c56a9f
 # ╟─342c4189-1164-4c0f-a4c9-029c8720caea
-# ╠═e1cc3acf-f257-443a-bf59-4253523739a7
-# ╠═a365088c-4239-4068-9367-d070b1ad8fce
-# ╠═36ce3c44-5f74-43bc-8d7f-ee5940ed0ea4
-# ╟─1f77e0aa-0feb-4add-8f3b-b3c3e4f8db2a
 # ╟─8e492f7d-b959-4635-b524-feb48ba5f139
-# ╟─ebc42c78-90d4-4a49-84c1-93afa4a3f8d9
